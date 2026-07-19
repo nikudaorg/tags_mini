@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery } from 'convex/react';
-import { useAuthActions } from '@convex-dev/auth/react';
+import { useClerk } from '@clerk/react';
 import { api } from '../../convex/_generated/api';
 import { buildGraph } from '../domain';
 import { useAppState, type Store } from '../state';
@@ -22,7 +22,7 @@ const TopBar = ({
   readonly crumb: string | null;
   readonly defaultTagLevel: number;
 }) => {
-  const { signOut } = useAuthActions();
+  const { signOut } = useClerk();
   return (
     <header className="topbar">
       <button className="wordmark" onClick={() => store.actions.goRoot()} title="Back to the index">

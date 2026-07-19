@@ -7,15 +7,15 @@ import schema from './schema';
 
 const modules = import.meta.glob('./**/*.ts');
 
-const asUser = (t: ReturnType<typeof convexTest>, userId: string) =>
-  t.withIdentity({ subject: `${userId}|session` });
+// convex-test derives tokenIdentifier as `${issuer}|${subject}`, which is
+// what the functions key ownership on — distinct subjects, distinct owners.
+const asUser = (t: ReturnType<typeof convexTest>, subject: string) =>
+  t.withIdentity({ subject });
 
 test('items and links are isolated per user', async () => {
   const t = convexTest(schema, modules);
-  const userA = await t.run((ctx) => ctx.db.insert('users', {}));
-  const userB = await t.run((ctx) => ctx.db.insert('users', {}));
-  const asA = asUser(t, userA);
-  const asB = asUser(t, userB);
+  const asA = asUser(t, 'user_a');
+  const asB = asUser(t, 'user_b');
 
   const noteA = await asA.mutation(api.items.createNote, { name: 'A note', text: 'secret A' });
   const noteB = await asB.mutation(api.items.createNote, { name: 'B note', text: 'secret B' });
@@ -41,10 +41,8 @@ test('items and links are isolated per user', async () => {
 
 test('links across two users cannot be created even with valid ids', async () => {
   const t = convexTest(schema, modules);
-  const userA = await t.run((ctx) => ctx.db.insert('users', {}));
-  const userB = await t.run((ctx) => ctx.db.insert('users', {}));
-  const asA = asUser(t, userA);
-  const asB = asUser(t, userB);
+  const asA = asUser(t, 'user_a');
+  const asB = asUser(t, 'user_b');
 
   const tagA = await asA.mutation(api.items.createTag, { level: 1, name: 'tagA', metadata: '' });
   const noteB = await asB.mutation(api.items.createNote, { name: 'B note', text: '' });

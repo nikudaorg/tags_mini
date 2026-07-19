@@ -1,12 +1,13 @@
 import { internalMutation } from './_generated/server';
 import { v } from 'convex/values';
 
-// Dev utility: `npx convex run seed:demo '{"userId":"<your users._id>"}'` fills
-// an empty account with a small corpus for trying the predicate flows. Find
-// your userId in the Convex dashboard's `users` table after signing in once.
-// No-op if that user already has data.
+// Dev utility: `npx convex run seed:demo '{"userId":"<issuer>|<clerk user id>"}'`
+// fills an empty account with a small corpus for trying the predicate flows.
+// userId is the Clerk tokenIdentifier — copy it from the userId of any row you
+// create after signing in (dashboard's `items` table). No-op if that user
+// already has data.
 export const demo = internalMutation({
-  args: { userId: v.id('users') },
+  args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
     const existing = await ctx.db
       .query('items')

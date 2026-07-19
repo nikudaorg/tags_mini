@@ -46,18 +46,22 @@ pnpm dev:backend   # convex dev (creates .env.local; anonymous local mode works)
 pnpm dev           # vite on http://localhost:5173
 ```
 
-Every account gets its own notes and tags — sign in with Google to use the app. That
-needs a Google OAuth client:
+Every account gets its own notes and tags — sign in (via [Clerk](https://clerk.com)) to
+use the app. That needs a Clerk application:
 
-1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create
-   an OAuth 2.0 Client ID (Web application). Authorized redirect URI:
-   `<your Convex deployment's HTTP Actions URL>/api/auth/callback/google` — find that
-   URL as `VITE_CONVEX_SITE_URL` in `.env.local` after running `pnpm dev:backend` once.
-2. `npx convex env set AUTH_GOOGLE_ID <client id>`
-3. `npx convex env set AUTH_GOOGLE_SECRET <client secret>`
+1. Create a Clerk app at [dashboard.clerk.com/apps/new](https://dashboard.clerk.com/apps/new)
+   and pick the sign-in providers you want.
+2. Activate the Convex integration at
+   [dashboard.clerk.com/apps/setup/convex](https://dashboard.clerk.com/apps/setup/convex)
+   and copy the Frontend API URL it shows, then
+   `npx convex env set CLERK_JWT_ISSUER_DOMAIN <that url>`.
+3. Copy the publishable key from
+   [the API keys page](https://dashboard.clerk.com/last-active?path=api-keys) into
+   `VITE_CLERK_PUBLISHABLE_KEY` in `.env.local`.
 
-Optional demo data for your account: find your `users._id` in the Convex dashboard after
-signing in once, then `npx convex run seed:demo '{"userId":"<that id>"}'`.
+Optional demo data for your account: sign in, create one note, copy its `userId` (your
+Clerk tokenIdentifier, `<issuer>|<clerk user id>`) from the Convex dashboard's `items`
+table, then `npx convex run seed:demo '{"userId":"<that value>"}'`.
 
 Tests and checks: `pnpm test` (predicate parser/renderer/evaluator), `pnpm typecheck`,
 `pnpm build`.
@@ -66,9 +70,9 @@ Tests and checks: `pnpm test` (predicate parser/renderer/evaluator), `pnpm typec
 
 1. `npx convex login`, then `npx convex deploy` — creates the production deployment and
    prints its URL.
-2. Repeat the Google OAuth setup above against production: a redirect URI for the prod
-   `VITE_CONVEX_SITE_URL`, then `npx convex env set AUTH_GOOGLE_ID/AUTH_GOOGLE_SECRET
-   <value> --prod`.
+2. Repeat the Clerk setup above against production: create (or promote to) a production
+   Clerk instance, then `npx convex env set CLERK_JWT_ISSUER_DOMAIN <prod issuer> --prod`
+   and use the production publishable key for the frontend build.
 3. On Vercel, import this repo. Build command:
    `npx convex deploy --cmd 'pnpm build'` (this sets `VITE_CONVEX_URL` for the build),
    output directory `dist`. Add `CONVEX_DEPLOY_KEY` (from the Convex dashboard) as an
@@ -79,9 +83,9 @@ Tests and checks: `pnpm test` (predicate parser/renderer/evaluator), `pnpm typec
 
 - `convex/schema.ts` — one `items` table for notes and tags (soft-deleted so undo can
   revive stable ids) and a `links` table for tag→item edges (level shape enforced in
-  `applyLinks`), plus the Convex Auth tables. Every `items`/`links` row carries a
-  `userId`; every query and mutation in `convex/items.ts` filters or checks ownership by
-  the caller's `ctx.auth` identity, so accounts never see each other's data.
+  `applyLinks`). Every `items`/`links` row carries a `userId` (the Clerk identity's
+  `tokenIdentifier`); every query and mutation in `convex/items.ts` filters or checks
+  ownership by the caller's `ctx.auth` identity, so accounts never see each other's data.
 - `src/domain/` — pure predicate algebra (token stream → AST → render/eval) and the
   visibility/cascade rules. Unit-tested.
 - `src/state/` — a small hand-rolled store: view state, selection, tag-edit modes, and

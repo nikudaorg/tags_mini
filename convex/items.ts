@@ -1,12 +1,19 @@
 import { query, mutation, internalMutation, type QueryCtx, type MutationCtx } from './_generated/server';
-import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 
 const linkPair = v.object({ tagId: v.id('items'), itemId: v.id('items') });
 
-const requireUserId = async (ctx: QueryCtx | MutationCtx): Promise<Id<'users'>> => {
-  const userId = await getAuthUserId(ctx);
+// Ownership is keyed on the Clerk identity's tokenIdentifier
+// ("<issuer>|<clerk user id>"), the canonical stable id Convex derives from
+// the validated JWT.
+const getUserId = async (ctx: QueryCtx | MutationCtx): Promise<string | null> => {
+  const identity = await ctx.auth.getUserIdentity();
+  return identity?.tokenIdentifier ?? null;
+};
+
+const requireUserId = async (ctx: QueryCtx | MutationCtx): Promise<string> => {
+  const userId = await getUserId(ctx);
   if (userId === null) throw new Error('Not authenticated');
   return userId;
 };
@@ -16,7 +23,7 @@ const requireUserId = async (ctx: QueryCtx | MutationCtx): Promise<Id<'users'>> 
 // which id belongs to someone else.
 const ownedItem = async (
   ctx: QueryCtx | MutationCtx,
-  userId: Id<'users'>,
+  userId: string,
   id: Id<'items'>,
 ): Promise<Doc<'items'> | null> => {
   const doc = await ctx.db.get(id);
@@ -29,7 +36,7 @@ const ownedItem = async (
 export const all = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (userId === null) return { items: [], links: [] };
     const items = await ctx.db
       .query('items')
@@ -58,7 +65,7 @@ export const all = query({
 export const getNote = query({
   args: { id: v.string() },
   handler: async (ctx, { id }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (userId === null) return null;
     const normalized = ctx.db.normalizeId('items', id);
     if (normalized === null) return null;
@@ -190,25 +197,28 @@ export const setMetadata = mutation({
   },
 });
 
-// One-off cleanup for rows written before this schema had userId (there was
-// exactly one such note/tag pair from manual testing). Run once via
-// `npx convex run items:claimOrphans '{"userId":"<your users._id>"}'`
-// (find your id in the dashboard's `users` table after signing in). No-op
-// once every row has an owner.
+// One-off cleanup for rows that predate the current auth setup: rows with no
+// userId at all, and rows owned by the old Convex Auth users table (those ids
+// never contain '|', while Clerk tokenIdentifiers always do). Run once via
+// `npx convex run items:claimOrphans '{"userId":"<issuer>|<clerk user id>"}'`
+// (copy the tokenIdentifier from the userId of any row you create after
+// signing in with Clerk, via the dashboard's `items` table). No-op once every
+// row has a Clerk owner.
 export const claimOrphans = internalMutation({
-  args: { userId: v.id('users') },
+  args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
+    const legacy = (owner: string | undefined) => owner === undefined || !owner.includes('|');
     const items = await ctx.db.query('items').collect();
     let claimed = 0;
     for (const item of items) {
-      if (item.userId === undefined) {
+      if (legacy(item.userId)) {
         await ctx.db.patch(item._id, { userId });
         claimed++;
       }
     }
     const links = await ctx.db.query('links').collect();
     for (const link of links) {
-      if (link.userId === undefined) await ctx.db.patch(link._id, { userId });
+      if (legacy(link.userId)) await ctx.db.patch(link._id, { userId });
     }
     return `claimed ${claimed} item(s)`;
   },
