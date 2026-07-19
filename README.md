@@ -46,8 +46,10 @@ pnpm dev:backend   # convex dev (creates .env.local; anonymous local mode works)
 pnpm dev           # vite on http://localhost:5173
 ```
 
-Every account gets its own notes and tags — sign in (via [Clerk](https://clerk.com)) to
-use the app. That needs a Clerk application:
+Clerk auth is optional: with neither `CLERK_JWT_ISSUER_DOMAIN` (backend) nor
+`VITE_CLERK_PUBLISHABLE_KEY` (frontend) set, `convex dev`/`convex deploy` still succeed
+and the app boots to a "configure Clerk" notice instead of crashing. Wire up Clerk to
+turn on sign-in — every account then gets its own notes and tags:
 
 1. Create a Clerk app at [dashboard.clerk.com/apps/new](https://dashboard.clerk.com/apps/new)
    and pick the sign-in providers you want.
