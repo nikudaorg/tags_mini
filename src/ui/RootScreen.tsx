@@ -1,6 +1,7 @@
 import { untaggedByLevel, type Graph } from '../domain';
 import type { Store } from '../state';
 import { levelName } from './BrowseScreen';
+import { openNoteTab } from './openNoteTab';
 
 // The first screen: every item nothing tags, sectioned by level, lower levels
 // first. Choosing a tag opens the two-pane browse window at its level.
@@ -71,7 +72,7 @@ export const RootScreen = ({
                 <button
                   key={it.id}
                   className="row"
-                  onDoubleClick={() => window.open(`/note/${it.id}`, '_blank', 'noopener')}
+                  onDoubleClick={() => openNoteTab(it.id)}
                   title="Double-click to open in a new tab"
                 >
                   <span className="name">{it.name}</span>

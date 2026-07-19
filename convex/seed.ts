@@ -1,20 +1,23 @@
 import { internalMutation } from './_generated/server';
+import { v } from 'convex/values';
 
-// Dev utility: `npx convex run seed:demo` fills an empty deployment with a
-// small corpus for trying the predicate flows. No-op if data already exists.
+// Dev utility: `npx convex run seed:demo '{"userId":"<your users._id>"}'` fills
+// an empty account with a small corpus for trying the predicate flows. Find
+// your userId in the Convex dashboard's `users` table after signing in once.
+// No-op if that user already has data.
 export const demo = internalMutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { userId: v.id('users') },
+  handler: async (ctx, { userId }) => {
     const existing = await ctx.db
       .query('items')
-      .withIndex('by_deleted', (q) => q.eq('deleted', false))
+      .withIndex('by_user_deleted', (q) => q.eq('userId', userId).eq('deleted', false))
       .collect();
     if (existing.length > 1) return 'already seeded';
 
     const tag = (level: number, name: string, metadata = '') =>
-      ctx.db.insert('items', { level, name, metadata, deleted: false });
+      ctx.db.insert('items', { userId, level, name, metadata, deleted: false });
     const note = (name: string, text: string) =>
-      ctx.db.insert('items', { level: 0, name, text, deleted: false });
+      ctx.db.insert('items', { userId, level: 0, name, text, deleted: false });
 
     const projects = await tag(1, 'projects', 'active workstreams');
     const reading = await tag(1, 'reading', '');
@@ -39,7 +42,7 @@ export const demo = internalMutation({
     await note('Scratch', 'Unfiled thoughts land here.');
 
     const link = (tagId: typeof projects, itemId: typeof migration) =>
-      ctx.db.insert('links', { tagId, itemId });
+      ctx.db.insert('links', { userId, tagId, itemId });
 
     await link(work, projects);
     await link(personal, reading);

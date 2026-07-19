@@ -19,13 +19,10 @@ import {
 } from '../state';
 import { Formula } from './FormulaBar';
 import { cx } from './cx';
+import { openNoteTab } from './openNoteTab';
 
 export const levelName = (level: number): string =>
   level === 0 ? 'Notes' : `Level ${level}`;
-
-const openNoteTab = (id: ItemId) => {
-  window.open(`/note/${id}`, '_blank', 'noopener');
-};
 
 // ---------- left pane ----------
 

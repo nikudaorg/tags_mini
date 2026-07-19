@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
+import { ConvexReactClient } from 'convex/react';
+import { ConvexAuthProvider } from '@convex-dev/auth/react';
 import { config } from './config';
 import { App } from './ui';
 import './styles.css';
@@ -12,8 +13,8 @@ if (rootEl === null) throw new Error('missing #root element');
 
 createRoot(rootEl).render(
   <StrictMode>
-    <ConvexProvider client={client}>
+    <ConvexAuthProvider client={client}>
       <App client={client} />
-    </ConvexProvider>
+    </ConvexAuthProvider>
   </StrictMode>,
 );

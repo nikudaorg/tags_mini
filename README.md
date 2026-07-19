@@ -46,7 +46,18 @@ pnpm dev:backend   # convex dev (creates .env.local; anonymous local mode works)
 pnpm dev           # vite on http://localhost:5173
 ```
 
-Optional demo data: `npx convex run seed:demo`.
+Every account gets its own notes and tags — sign in with Google to use the app. That
+needs a Google OAuth client:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create
+   an OAuth 2.0 Client ID (Web application). Authorized redirect URI:
+   `<your Convex deployment's HTTP Actions URL>/api/auth/callback/google` — find that
+   URL as `VITE_CONVEX_SITE_URL` in `.env.local` after running `pnpm dev:backend` once.
+2. `npx convex env set AUTH_GOOGLE_ID <client id>`
+3. `npx convex env set AUTH_GOOGLE_SECRET <client secret>`
+
+Optional demo data for your account: find your `users._id` in the Convex dashboard after
+signing in once, then `npx convex run seed:demo '{"userId":"<that id>"}'`.
 
 Tests and checks: `pnpm test` (predicate parser/renderer/evaluator), `pnpm typecheck`,
 `pnpm build`.
@@ -55,17 +66,22 @@ Tests and checks: `pnpm test` (predicate parser/renderer/evaluator), `pnpm typec
 
 1. `npx convex login`, then `npx convex deploy` — creates the production deployment and
    prints its URL.
-2. On Vercel, import this repo. Build command:
+2. Repeat the Google OAuth setup above against production: a redirect URI for the prod
+   `VITE_CONVEX_SITE_URL`, then `npx convex env set AUTH_GOOGLE_ID/AUTH_GOOGLE_SECRET
+   <value> --prod`.
+3. On Vercel, import this repo. Build command:
    `npx convex deploy --cmd 'pnpm build'` (this sets `VITE_CONVEX_URL` for the build),
    output directory `dist`. Add `CONVEX_DEPLOY_KEY` (from the Convex dashboard) as an
    environment variable.
-3. `vercel.json` already rewrites all routes to `index.html` so `/note/:id` links work.
+4. `vercel.json` already rewrites all routes to `index.html` so `/note/:id` links work.
 
 ## Architecture notes
 
 - `convex/schema.ts` — one `items` table for notes and tags (soft-deleted so undo can
   revive stable ids) and a `links` table for tag→item edges (level shape enforced in
-  `applyLinks`).
+  `applyLinks`), plus the Convex Auth tables. Every `items`/`links` row carries a
+  `userId`; every query and mutation in `convex/items.ts` filters or checks ownership by
+  the caller's `ctx.auth` identity, so accounts never see each other's data.
 - `src/domain/` — pure predicate algebra (token stream → AST → render/eval) and the
   visibility/cascade rules. Unit-tested.
 - `src/state/` — a small hand-rolled store: view state, selection, tag-edit modes, and

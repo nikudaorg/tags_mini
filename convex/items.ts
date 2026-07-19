@@ -1,19 +1,44 @@
-import { query, mutation } from './_generated/server';
+import { query, mutation, internalMutation, type QueryCtx, type MutationCtx } from './_generated/server';
+import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
-import type { Id } from './_generated/dataModel';
+import type { Doc, Id } from './_generated/dataModel';
 
 const linkPair = v.object({ tagId: v.id('items'), itemId: v.id('items') });
 
-// The whole graph in one subscription. The dataset is a personal corpus;
-// filtering and predicate evaluation happen client-side over this snapshot.
+const requireUserId = async (ctx: QueryCtx | MutationCtx): Promise<Id<'users'>> => {
+  const userId = await getAuthUserId(ctx);
+  if (userId === null) throw new Error('Not authenticated');
+  return userId;
+};
+
+// Loads an item and checks it belongs to the caller; returns null for
+// missing, foreign, or deleted-and-not-expected items rather than leaking
+// which id belongs to someone else.
+const ownedItem = async (
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<'users'>,
+  id: Id<'items'>,
+): Promise<Doc<'items'> | null> => {
+  const doc = await ctx.db.get(id);
+  if (doc === null || doc.userId !== userId) return null;
+  return doc;
+};
+
+// The whole graph in one subscription, scoped to the caller. Filtering and
+// predicate evaluation happen client-side over this snapshot.
 export const all = query({
   args: {},
   handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return { items: [], links: [] };
     const items = await ctx.db
       .query('items')
-      .withIndex('by_deleted', (q) => q.eq('deleted', false))
+      .withIndex('by_user_deleted', (q) => q.eq('userId', userId).eq('deleted', false))
       .collect();
-    const links = await ctx.db.query('links').collect();
+    const links = await ctx.db
+      .query('links')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
     const alive = new Set(items.map((i) => i._id));
     return {
       items: items.map((i) => ({
@@ -33,9 +58,11 @@ export const all = query({
 export const getNote = query({
   args: { id: v.string() },
   handler: async (ctx, { id }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
     const normalized = ctx.db.normalizeId('items', id);
     if (normalized === null) return null;
-    const doc = await ctx.db.get(normalized);
+    const doc = await ownedItem(ctx, userId, normalized);
     if (doc === null || doc.deleted || doc.level !== 0) return null;
     return { id: doc._id, name: doc.name, text: doc.text ?? '' };
   },
@@ -43,15 +70,18 @@ export const getNote = query({
 
 export const createNote = mutation({
   args: { name: v.string(), text: v.string() },
-  handler: async (ctx, { name, text }) =>
-    ctx.db.insert('items', { level: 0, name, text, deleted: false }),
+  handler: async (ctx, { name, text }) => {
+    const userId = await requireUserId(ctx);
+    return ctx.db.insert('items', { userId, level: 0, name, text, deleted: false });
+  },
 });
 
 export const createTag = mutation({
   args: { level: v.number(), name: v.string(), metadata: v.string() },
   handler: async (ctx, { level, name, metadata }) => {
+    const userId = await requireUserId(ctx);
     if (!Number.isInteger(level) || level < 1) throw new Error(`invalid tag level ${level}`);
-    return ctx.db.insert('items', { level, name, metadata, deleted: false });
+    return ctx.db.insert('items', { userId, level, name, metadata, deleted: false });
   },
 });
 
@@ -61,7 +91,8 @@ export const createTag = mutation({
 export const remove = mutation({
   args: { id: v.id('items') },
   handler: async (ctx, { id }) => {
-    const doc = await ctx.db.get(id);
+    const userId = await requireUserId(ctx);
+    const doc = await ownedItem(ctx, userId, id);
     if (doc === null || doc.deleted) return { links: [] };
     await ctx.db.patch(id, { deleted: true });
     const asTag = await ctx.db
@@ -84,12 +115,15 @@ export const remove = mutation({
 export const restore = mutation({
   args: { id: v.id('items'), links: v.array(linkPair) },
   handler: async (ctx, { id, links }) => {
+    const userId = await requireUserId(ctx);
+    const doc = await ownedItem(ctx, userId, id);
+    if (doc === null) return;
     await ctx.db.patch(id, { deleted: false });
     for (const pair of links) {
-      const tag = await ctx.db.get(pair.tagId);
-      const item = await ctx.db.get(pair.itemId);
+      const tag = await ownedItem(ctx, userId, pair.tagId);
+      const item = await ownedItem(ctx, userId, pair.itemId);
       if (tag === null || item === null || tag.deleted || item.deleted) continue;
-      await ctx.db.insert('links', pair);
+      await ctx.db.insert('links', { userId, ...pair });
     }
   },
 });
@@ -100,18 +134,19 @@ export const restore = mutation({
 export const applyLinks = mutation({
   args: { add: v.array(linkPair), remove: v.array(linkPair) },
   handler: async (ctx, { add, remove }) => {
+    const userId = await requireUserId(ctx);
     for (const pair of remove) {
       const rows = await ctx.db
         .query('links')
         .withIndex('by_tag', (q) => q.eq('tagId', pair.tagId))
         .collect();
       for (const row of rows) {
-        if (row.itemId === pair.itemId) await ctx.db.delete(row._id);
+        if (row.itemId === pair.itemId && row.userId === userId) await ctx.db.delete(row._id);
       }
     }
     for (const pair of add) {
-      const tag = await ctx.db.get(pair.tagId);
-      const item = await ctx.db.get(pair.itemId);
+      const tag = await ownedItem(ctx, userId, pair.tagId);
+      const item = await ownedItem(ctx, userId, pair.itemId);
       if (tag === null || item === null || tag.deleted || item.deleted) continue;
       if (tag.level !== item.level + 1)
         throw new Error(`link level mismatch: tag ${tag.level} over item ${item.level}`);
@@ -120,7 +155,7 @@ export const applyLinks = mutation({
         .withIndex('by_tag', (q) => q.eq('tagId', pair.tagId))
         .collect();
       if (existing.some((l) => l.itemId === pair.itemId)) continue;
-      await ctx.db.insert('links', pair);
+      await ctx.db.insert('links', { userId, ...pair });
     }
   },
 });
@@ -128,6 +163,9 @@ export const applyLinks = mutation({
 export const setText = mutation({
   args: { id: v.id('items'), text: v.string() },
   handler: async (ctx, { id, text }) => {
+    const userId = await requireUserId(ctx);
+    const doc = await ownedItem(ctx, userId, id);
+    if (doc === null) throw new Error('Not found');
     await ctx.db.patch(id, { text });
   },
 });
@@ -135,6 +173,9 @@ export const setText = mutation({
 export const setName = mutation({
   args: { id: v.id('items'), name: v.string() },
   handler: async (ctx, { id, name }) => {
+    const userId = await requireUserId(ctx);
+    const doc = await ownedItem(ctx, userId, id);
+    if (doc === null) throw new Error('Not found');
     await ctx.db.patch(id, { name });
   },
 });
@@ -142,6 +183,33 @@ export const setName = mutation({
 export const setMetadata = mutation({
   args: { id: v.id('items'), metadata: v.string() },
   handler: async (ctx, { id, metadata }) => {
+    const userId = await requireUserId(ctx);
+    const doc = await ownedItem(ctx, userId, id);
+    if (doc === null) throw new Error('Not found');
     await ctx.db.patch(id, { metadata });
+  },
+});
+
+// One-off cleanup for rows written before this schema had userId (there was
+// exactly one such note/tag pair from manual testing). Run once via
+// `npx convex run items:claimOrphans '{"userId":"<your users._id>"}'`
+// (find your id in the dashboard's `users` table after signing in). No-op
+// once every row has an owner.
+export const claimOrphans = internalMutation({
+  args: { userId: v.id('users') },
+  handler: async (ctx, { userId }) => {
+    const items = await ctx.db.query('items').collect();
+    let claimed = 0;
+    for (const item of items) {
+      if (item.userId === undefined) {
+        await ctx.db.patch(item._id, { userId });
+        claimed++;
+      }
+    }
+    const links = await ctx.db.query('links').collect();
+    for (const link of links) {
+      if (link.userId === undefined) await ctx.db.patch(link._id, { userId });
+    }
+    return `claimed ${claimed} item(s)`;
   },
 });

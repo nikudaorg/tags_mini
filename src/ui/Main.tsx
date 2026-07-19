@@ -1,11 +1,13 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery } from 'convex/react';
+import { useAuthActions } from '@convex-dev/auth/react';
 import { api } from '../../convex/_generated/api';
 import { buildGraph } from '../domain';
 import { useAppState, type Store } from '../state';
 import { BrowseScreen, levelName } from './BrowseScreen';
 import { RootScreen } from './RootScreen';
 import { Dialogs } from './Dialogs';
+import { openNoteTab } from './openNoteTab';
 
 const TopBar = ({
   store,
@@ -19,45 +21,51 @@ const TopBar = ({
   readonly canRedo: boolean;
   readonly crumb: string | null;
   readonly defaultTagLevel: number;
-}) => (
-  <header className="topbar">
-    <button className="wordmark" onClick={() => store.actions.goRoot()} title="Back to the index">
-      strata
-    </button>
-    <nav className="crumbs" aria-label="location">
-      <span>Index</span>
-      {crumb !== null && (
-        <>
-          <span className="sep">›</span>
-          <span className="here">{crumb}</span>
-        </>
-      )}
-    </nav>
-    <span className="spacer" />
-    <button
-      className="btn quiet"
-      disabled={!canUndo}
-      onClick={() => void store.actions.undo()}
-      title="Undo (⌘Z)"
-    >
-      ↶ Undo
-    </button>
-    <button
-      className="btn quiet"
-      disabled={!canRedo}
-      onClick={() => void store.actions.redo()}
-      title="Redo (⇧⌘Z)"
-    >
-      ↷ Redo
-    </button>
-    <button className="btn" onClick={() => store.actions.openCreateTag(defaultTagLevel)}>
-      New tag
-    </button>
-    <button className="btn primary" onClick={() => store.actions.openCreateNote('', false)}>
-      New note
-    </button>
-  </header>
-);
+}) => {
+  const { signOut } = useAuthActions();
+  return (
+    <header className="topbar">
+      <button className="wordmark" onClick={() => store.actions.goRoot()} title="Back to the index">
+        strata
+      </button>
+      <nav className="crumbs" aria-label="location">
+        <span>Index</span>
+        {crumb !== null && (
+          <>
+            <span className="sep">›</span>
+            <span className="here">{crumb}</span>
+          </>
+        )}
+      </nav>
+      <span className="spacer" />
+      <button
+        className="btn quiet"
+        disabled={!canUndo}
+        onClick={() => void store.actions.undo()}
+        title="Undo (⌘Z)"
+      >
+        ↶ Undo
+      </button>
+      <button
+        className="btn quiet"
+        disabled={!canRedo}
+        onClick={() => void store.actions.redo()}
+        title="Redo (⇧⌘Z)"
+      >
+        ↷ Redo
+      </button>
+      <button className="btn" onClick={() => store.actions.openCreateTag(defaultTagLevel)}>
+        New tag
+      </button>
+      <button className="btn primary" onClick={() => store.actions.openCreateNote('', false)}>
+        New note
+      </button>
+      <button className="btn quiet" onClick={() => void signOut()} title="Sign out">
+        Sign out
+      </button>
+    </header>
+  );
+};
 
 const isEditableTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
@@ -138,7 +146,7 @@ export const Main = ({ store }: { readonly store: Store }) => {
           }
           const cursor = st.cursor;
           if (cursor !== null && store.graph().items.get(cursor)?.level === 0)
-            window.open(`/note/${cursor}`, '_blank', 'noopener');
+            openNoteTab(cursor);
           return;
         }
         case 'o':
