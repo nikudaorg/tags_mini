@@ -1,0 +1,592 @@
+/* Strata — index-drawer instrument. Tokens per DESIGN.md. */
+
+:root {
+  --bg: oklch(1 0 0);
+  --surface: oklch(0.965 0.004 350);
+  --surface-2: oklch(0.93 0.006 350);
+  --line: oklch(0.87 0.008 350);
+  --ink: oklch(0.21 0.02 350);
+  --muted: oklch(0.47 0.02 350);
+  --primary: oklch(0.45 0.163 350);
+  --primary-tint: oklch(0.95 0.03 350);
+  --accent: oklch(0.38 0.13 275);
+  --accent-tint: oklch(0.94 0.03 275);
+  --op: oklch(0.5 0.2 27);
+  --bracket: oklch(0.49 0.16 255);
+  --partial: oklch(0.88 0.09 80);
+  --danger: oklch(0.5 0.2 27);
+  --danger-tint: oklch(0.95 0.03 27);
+
+  --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --t: 160ms;
+
+  /* z scale */
+  --z-marquee: 10;
+  --z-bar: 20;
+  --z-dialog: 40;
+  --z-toast: 50;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+::selection { background: var(--primary-tint); }
+
+/* ---------- app shell ---------- */
+
+.shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.wordmark {
+  font: 600 15px var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  margin-right: 4px;
+}
+.wordmark:hover { color: var(--ink); }
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.crumbs .sep { color: var(--line); }
+.crumbs .here { color: var(--ink); font-weight: 500; }
+
+.topbar .spacer { flex: 1; }
+
+/* ---------- buttons ---------- */
+
+.btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  transition: background var(--t) var(--ease), border-color var(--t) var(--ease);
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--surface); }
+.btn:active:not(:disabled) { background: var(--surface-2); }
+.btn:disabled { color: var(--muted); opacity: 0.55; cursor: default; }
+
+.btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+.btn.primary:hover:not(:disabled) { background: oklch(0.4 0.163 350); border-color: oklch(0.4 0.163 350); }
+.btn.primary:active:not(:disabled) { background: oklch(0.36 0.163 350); }
+
+.btn.danger { color: var(--danger); border-color: var(--danger-tint); }
+.btn.danger:hover:not(:disabled) { background: var(--danger-tint); }
+
+.btn.quiet { border-color: transparent; color: var(--muted); }
+.btn.quiet:hover:not(:disabled) { color: var(--ink); background: var(--surface); }
+
+.btn.on {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+kbd {
+  font: 11px var(--mono);
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+/* ---------- panes ---------- */
+
+.panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 44% 1fr;
+}
+
+.pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pane + .pane { border-left: 1px solid var(--line); }
+
+.pane-head {
+  flex: none;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.pane-title { font-size: 13px; font-weight: 600; }
+.pane-count { font-size: 12px; color: var(--muted); }
+.pane-head .spacer { flex: 1; }
+
+.pane-body {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  padding: 4px 0 12px;
+  user-select: none;
+}
+
+.pane-empty {
+  padding: 28px 20px;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 46ch;
+}
+.pane-empty b { color: var(--ink); font-weight: 600; }
+
+/* ---------- rows ---------- */
+
+.row {
+  width: 100%;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  font-size: 14px;
+  transition: background var(--t) var(--ease);
+}
+.row:hover { background: var(--surface); }
+
+.row .name {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row .meta {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  text-align: right;
+}
+.row .count {
+  font: 11.5px var(--mono);
+  color: var(--muted);
+  flex: none;
+  min-width: 2ch;
+  text-align: right;
+}
+
+/* dot marks formula membership on the left pane */
+.row .dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background var(--t) var(--ease);
+}
+.row.in-formula .dot { background: var(--primary); }
+.row.in-formula { background: var(--primary-tint); }
+.row.in-formula:hover { background: oklch(0.92 0.04 350); }
+
+/* right-pane selection */
+.row.selected {
+  background: var(--primary-tint);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.row.cursor { box-shadow: inset 0 0 0 1px var(--muted); }
+.row.selected.cursor { box-shadow: inset 0 0 0 2px var(--primary); }
+
+/* tri-state rows in tag-edit mode; each state carries a glyph, not only color */
+.row .state-glyph {
+  flex: none;
+  width: 16px;
+  font: 12px var(--mono);
+  color: var(--muted);
+  text-align: center;
+}
+.row.edit-on { background: var(--primary); color: white; }
+.row.edit-on .name, .row.edit-on .count, .row.edit-on .state-glyph { color: white; }
+.row.edit-on:hover { background: oklch(0.4 0.163 350); }
+.row.edit-on-hidden { background: var(--accent); color: white; }
+.row.edit-on-hidden .name, .row.edit-on-hidden .count, .row.edit-on-hidden .state-glyph { color: white; }
+.row.edit-on-hidden:hover { background: oklch(0.33 0.13 275); }
+.row.edit-some { background: var(--partial); }
+.row.edit-some:hover { background: oklch(0.84 0.1 80); }
+.row.edit-some .hidden-badge { background: oklch(0.21 0.02 350 / 0.1); color: var(--ink); }
+
+.hidden-badge {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: oklch(1 0 0 / 0.22);
+  color: white;
+}
+
+/* ---------- formula bar ---------- */
+
+.formula-bar {
+  flex: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  z-index: var(--z-bar);
+}
+
+.formula-label {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.formula {
+  flex: 1;
+  min-width: 0;
+  font: 15px/1.5 var(--mono);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+.f-term { color: var(--ink); }
+.f-op { color: var(--op); font-weight: 600; }
+.f-bracket { color: var(--bracket); font-weight: 600; }
+.f-pending { opacity: 0.45; }
+.f-empty { color: var(--muted); font-family: var(--sans); font-size: 13px; }
+
+/* editable formula: tokens are caret targets */
+.formula.editable { cursor: text; }
+.formula.editable .f-token {
+  cursor: text;
+  border-radius: 4px;
+  padding: 1px 1px;
+  transition: background var(--t) var(--ease);
+}
+.formula.editable .f-token:hover { background: var(--surface-2); }
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  background: var(--accent);
+  vertical-align: -0.15em;
+  margin: 0 0.5px;
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+
+.formula-hintline {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* mode bar replaces the formula bar during tag edits */
+.mode-bar {
+  background: var(--accent-tint);
+  border-top-color: var(--accent);
+}
+.mode-bar .formula-label { color: var(--accent); font-weight: 600; }
+
+/* ---------- legend chips (tag edit) ---------- */
+.legend {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  align-items: center;
+  white-space: nowrap;
+}
+.legend .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  border: 1px solid var(--line);
+}
+.legend .sw-on { background: var(--primary); border-color: var(--primary); }
+.legend .sw-hidden { background: var(--accent); border-color: var(--accent); }
+.legend .sw-some { background: var(--partial); border-color: var(--partial); }
+
+/* ---------- inspector ---------- */
+
+.inspector {
+  flex: none;
+  border-top: 1px solid var(--line);
+  padding: 8px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--bg);
+}
+.inspector label { font-size: 12px; color: var(--muted); flex: none; }
+.inspector input {
+  font: 13px var(--mono);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: var(--bg);
+  min-width: 0;
+}
+.inspector input:focus { border-color: var(--accent); outline: none; }
+.inspector .grow { flex: 1; }
+
+/* ---------- marquee ---------- */
+
+.marquee {
+  position: fixed;
+  z-index: var(--z-marquee);
+  border: 1px solid var(--primary);
+  background: oklch(0.45 0.163 350 / 0.08);
+  pointer-events: none;
+}
+
+/* ---------- root screen ---------- */
+
+.root-screen {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px clamp(16px, 6vw, 72px) 64px;
+}
+.root-screen h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.root-screen .subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 28px;
+  max-width: 62ch;
+}
+.root-section { margin-bottom: 28px; }
+.root-section h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.root-section h2 .lvl {
+  font: 600 11px var(--mono);
+  color: var(--bracket);
+}
+.root-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 2px 16px;
+  max-width: 980px;
+}
+.root-list .row { border-radius: 6px; }
+
+.empty-hero {
+  max-width: 52ch;
+  margin-top: 8vh;
+}
+.empty-hero .formula-demo {
+  font: 15px var(--mono);
+  margin: 16px 0 20px;
+}
+.empty-hero p { color: var(--muted); }
+
+/* ---------- dialogs ---------- */
+
+dialog {
+  width: min(400px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--ink);
+  z-index: var(--z-dialog);
+}
+dialog::backdrop { background: oklch(0.21 0.02 350 / 0.25); }
+dialog h3 { margin: 0 0 12px; font-size: 15px; }
+dialog form { display: flex; flex-direction: column; gap: 10px; }
+dialog label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+dialog input[type='text'], dialog textarea {
+  font: 13px var(--mono);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--bg);
+}
+dialog input:focus, dialog textarea:focus { border-color: var(--accent); outline: none; }
+dialog textarea { resize: vertical; min-height: 72px; max-height: 200px; }
+dialog .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+dialog .paste-preview {
+  font: 12px var(--mono);
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  max-height: 96px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.level-stepper { display: flex; align-items: center; gap: 8px; }
+.level-stepper output { font: 600 14px var(--mono); min-width: 3ch; text-align: center; }
+
+/* ---------- hint toast ---------- */
+
+.hint-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 60px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  z-index: var(--z-toast);
+  animation: hint-in var(--t) var(--ease);
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+}
+@keyframes hint-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ---------- note editor ---------- */
+
+.note-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.note-editor header {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px clamp(16px, 12vw, 120px) 8px;
+}
+.note-editor h1 {
+  font: 600 17px var(--mono);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-editor .save-state { font-size: 12px; color: var(--muted); flex: none; }
+.note-editor textarea {
+  flex: 1;
+  border: none;
+  resize: none;
+  padding: 8px clamp(16px, 12vw, 120px) 48px;
+  font: 15px/1.6 var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  max-width: 100%;
+}
+.note-editor textarea:focus { outline: none; }
+.note-missing {
+  margin: 20vh auto 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ---------- loading ---------- */
+
+.skeleton-list { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.skeleton {
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 840px) {
+  .panes { grid-template-columns: 1fr; grid-template-rows: minmax(0, 5fr) minmax(0, 7fr); }
+  .pane + .pane { border-left: none; border-top: 1px solid var(--line); }
+  .crumbs { display: none; }
+  .formula-hintline { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+}
