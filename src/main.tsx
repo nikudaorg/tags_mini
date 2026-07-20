@@ -12,29 +12,14 @@ const client = new ConvexReactClient(config.convexUrl);
 const rootEl = document.getElementById('root');
 if (rootEl === null) throw new Error('missing #root element');
 
-// Shown when no Clerk publishable key is configured. @clerk/react has no
-// keyless mode (unlike @clerk/nextjs), so without a key we can't mount
-// ClerkProvider — surface a clear notice instead of a blank screen.
-const ClerkNotice = () => (
-  <div className="root-screen">
-    <div className="empty-hero">
-      <h1>Strata</h1>
-      <p>
-        Clerk isn&apos;t configured yet. Set <code>VITE_CLERK_PUBLISHABLE_KEY</code> (a Clerk
-        publishable key — a keyless/dev key works) and rebuild to enable sign-in.
-      </p>
-    </div>
-  </div>
+// Mount Clerk unconditionally and let the library resolve the publishable key
+// itself (prop → import.meta.env → any keyless bootstrap it supports).
+createRoot(rootEl).render(
+  <StrictMode>
+    <ClerkProvider publishableKey={config.clerkPublishableKey}>
+      <ConvexProviderWithClerk client={client} useAuth={useAuth}>
+        <App client={client} />
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+  </StrictMode>,
 );
-
-const tree = config.clerkPublishableKey ? (
-  <ClerkProvider publishableKey={config.clerkPublishableKey}>
-    <ConvexProviderWithClerk client={client} useAuth={useAuth}>
-      <App client={client} />
-    </ConvexProviderWithClerk>
-  </ClerkProvider>
-) : (
-  <ClerkNotice />
-);
-
-createRoot(rootEl).render(<StrictMode>{tree}</StrictMode>);
